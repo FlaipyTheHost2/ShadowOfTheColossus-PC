@@ -1,5 +1,21 @@
 # Changelog
 
+## Linux (não lançado)
+- **Port nativo para Linux** (sem Wine/Proton). **Testado numa placa AMD** (Fedora): o jogo abre e
+  renderiza a abertura. **NVIDIA e Intel ainda precisam de teste.**
+- Loader: imagem abaixo de 2 GiB também no Linux (ponteiros de 31 bits do jogo); guarda do heap
+  BPE com `int3`/passo único via `SIGTRAP`; janela de leitura das threads auxiliares com leituras
+  precisas (a proteção volta pelo estado do rastreador de páginas); SSE4a interpretado no
+  `SIGILL`; pilha alternativa de sinal de 512 KiB por thread (pilhas das fibras sem página de
+  guarda); watchdog de diagnóstico desligado por padrão (`BB_TIMEOUT`).
+- Arquivos do jogo achados sem diferenciar maiúsculas e minúsculas (o jogo pede em minúsculas, o
+  dump tem nomes mistos). DLCs lidas com `opendir`. Leituras limpas dos *walkers* no Linux.
+- Build: `build.sh` com LF (`.gitattributes`), correções de portabilidade (GCC 14), xbyak em todas
+  as plataformas, FFmpeg mínimo em `out/ffmpeg` (`packaging/linux/build_ffmpeg.sh`).
+- `sotc.py` multiplataforma e com `SOTC_DATA_DIR`; `sotc.sh`; AppImage
+  (`packaging/linux/build_appimage.sh`) que pede a pasta do jogo na primeira abertura e acha os
+  módulos de som do shadPS4. Opções: `docs/sotc/LINUX.md`.
+
 ## 0.60.6-plus26 — 2026-10-29 (fork Lucas-blip-png)
 - **CPUs de 4 threads mais rápidas (cochilo das threads de jobs, do fork do MMadmer, c301eef):** as threads de jobs do jogo ficavam testando a fila sem parar enquanto esperavam trabalho (no PS4 cada uma tem um núcleo só seu). Agora, depois de 64 tentativas vazias seguidas, cochilam 100 µs e devolvem o núcleo ao render. Santuário, A/B intercalado: **4 CPUs 61,8 e 60,0 FPS ligado contra 49,3 e 52,8 desligado (+19%)**; 16 CPUs sem diferença (69,5/75,8 contra 69,2/75,7). `SOTC_POLL_NAP_US=0` desliga. Crédito: Madmer (MMadmer), autor do commit.
 - **Contagem de CPUs pela máscara de afinidade:** o modo de CPU fraca do processador de comandos e o número de workers de pipeline usavam o total de threads do sistema, não as que o processo pode usar (ideia do `UsableCpuCount` do MMadmer). Em PCs de verdade nada muda; os testes com 4 CPUs agora representam um PC de 4 threads.
