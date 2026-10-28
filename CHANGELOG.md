@@ -15,6 +15,10 @@
 - `sotc.py` multiplataforma e com `SOTC_DATA_DIR`; `sotc.sh`; AppImage
   (`packaging/linux/build_appimage.sh`) que pede a pasta do jogo na primeira abertura e acha os
   módulos de som do shadPS4. Opções: `docs/sotc/LINUX.md`.
+- **Lançador na AppImage:** a AppImage abre o mesmo lançador do Windows (FPS, modo PS4 Pro,
+  upscaler, texturas, controles, saves...), com Python e Tk próprios dentro dela, sem instalar
+  nada. Na primeira abertura ele lê o `sotc.ini` que já existir. `--play` joga com os ajustes
+  salvos sem abrir a janela (opções de inicialização da Steam).
 
 ## 0.60.6-plus26 — 2026-10-29 (fork Lucas-blip-png)
 - **CPUs de 4 threads mais rápidas (cochilo das threads de jobs, do fork do MMadmer, c301eef):** as threads de jobs do jogo ficavam testando a fila sem parar enquanto esperavam trabalho (no PS4 cada uma tem um núcleo só seu). Agora, depois de 64 tentativas vazias seguidas, cochilam 100 µs e devolvem o núcleo ao render. Santuário, A/B intercalado: **4 CPUs 61,8 e 60,0 FPS ligado contra 49,3 e 52,8 desligado (+19%)**; 16 CPUs sem diferença (69,5/75,8 contra 69,2/75,7). `SOTC_POLL_NAP_US=0` desliga. Crédito: Madmer (MMadmer), autor do commit.
