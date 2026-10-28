@@ -195,7 +195,7 @@ public:
             return true;
         }
         if (!rfile) {
-            rfile = _wfopen(path.c_str(), L"rb");
+            rfile = Common::FS::OpenCFile(path, Common::FS::FileAccessMode::Read);
             if (rfile) {
                 std::setvbuf(rfile, nullptr, _IONBF, 0);
             }
@@ -235,7 +235,7 @@ private:
             std::scoped_lock lk{mtx};
             p = path;
         }
-        wfile = _wfopen(p.c_str(), L"wb");
+        wfile = Common::FS::OpenCFile(p, Common::FS::FileAccessMode::Create);
         std::scoped_lock lk{mtx};
         if (!wfile) {
             failed = true;
@@ -480,7 +480,7 @@ static constexpr char PackMagic[8] = {'S', 'O', 'T', 'C', 'P', 'K', '1', '\0'};
 
 static void ReadCachePack(const std::filesystem::path& path,
                           std::map<std::string, std::vector<u8>>& out) {
-    std::FILE* f = _wfopen(path.c_str(), L"rb");
+    std::FILE* f = Common::FS::OpenCFile(path, Common::FS::FileAccessMode::Read);
     if (!f) {
         return;
     }
@@ -532,7 +532,7 @@ static void ReadCachePack(const std::filesystem::path& path,
 // of a session that was killed, as a journal is never appended to by a later session.
 static size_t ReadJournal(const std::filesystem::path& path,
                           std::map<std::string, std::vector<u8>>& out) {
-    std::FILE* f = _wfopen(path.c_str(), L"rb");
+    std::FILE* f = Common::FS::OpenCFile(path, Common::FS::FileAccessMode::Read);
     if (!f) {
         return 0;
     }
@@ -582,7 +582,7 @@ static void WriteCachePack(std::filesystem::path path,
                            std::vector<std::filesystem::path> merged_journals) {
     auto tmp = path;
     tmp += L".tmp";
-    std::FILE* f = _wfopen(tmp.c_str(), L"wb");
+    std::FILE* f = Common::FS::OpenCFile(tmp, Common::FS::FileAccessMode::Create);
     if (!f) {
         return;
     }
