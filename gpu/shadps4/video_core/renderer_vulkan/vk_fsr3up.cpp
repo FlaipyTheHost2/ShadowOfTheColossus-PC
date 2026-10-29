@@ -12,6 +12,10 @@
 #include <deque>
 #include <vector>
 #include <vk_mem_alloc.h>
+#ifndef _WIN32
+#include <strings.h>
+#define _stricmp strcasecmp // sotc (Linux)
+#endif
 
 #include <ffx_vk_fsr3_3_1_5_bridge.h>
 

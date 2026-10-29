@@ -10,6 +10,9 @@
 // only captures the frame inputs FSR 3 frame generation uses.
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <strings.h>
+#define _stricmp strcasecmp // sotc (Linux)
 #endif
 
 #include <algorithm>
@@ -158,10 +161,12 @@ bool Resolve(T*& out, const char* name) {
 }
 #endif
 
+#ifdef _WIN32
 template <typename T>
 void GetProcAddressInto(T*& out, const char* name) {
     out = reinterpret_cast<T*>(GetProcAddress(api.dll, name));
 }
+#endif
 
 template <typename T>
 bool ResolveFeature(T*& out, sl::Feature feature, const char* name) {
@@ -842,6 +847,7 @@ void OnDeviceCreated(const Instance& instance) {
         std::fprintf(stderr, "SOTC DLSS Super Resolution: %s (%d)\n",
                      sr_supported ? "available" : "not available, FSR 3.1 instead", static_cast<int>(sr));
         // sotc: which DLSS this is (the NGX runtime decides the model), so a report says it.
+#ifdef _WIN32 // sotc: Streamline is Windows only (sl.interposer.dll)
         if (sr_supported) {
             if (auto* get_version = reinterpret_cast<PFun_slGetFeatureVersion*>(
                     GetProcAddress(api.dll, "slGetFeatureVersion"))) {
@@ -853,6 +859,7 @@ void OnDeviceCreated(const Instance& instance) {
                 }
             }
         }
+#endif
     }
     const sl::Result dlssg = api.is_supported(sl::kFeatureDLSS_G, adapter);
     const sl::Result reflex = api.is_supported(sl::kFeatureReflex, adapter);

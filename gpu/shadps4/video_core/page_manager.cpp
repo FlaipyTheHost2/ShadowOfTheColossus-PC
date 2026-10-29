@@ -42,6 +42,7 @@ extern "C" void runtime_memory_tag(const void* p, size_t size, const char* name)
 
 #ifndef _WIN64
 #include <sys/mman.h>
+#include <unistd.h> // sotc: gettid (SOTC_PROTECT_STATS)
 #else
 #include <windows.h>
 #endif
@@ -839,10 +840,55 @@ struct SignalImpl : public PageManager::Impl {
         Shader::SetSrtCleanLoad(&SrtWalkerCleanLoad);
     }
 
+    // sotc: thread id, clocks and thread name for SOTC_PROTECT_STATS, per platform.
+    static u32 StatsThreadId() {
+#ifdef _WIN64
+        return GetCurrentThreadId();
+#else
+        return static_cast<u32>(gettid());
+#endif
+    }
+    static u64 StatsNowMs() {
+#ifdef _WIN64
+        return GetTickCount64();
+#else
+        return static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now().time_since_epoch())
+                                    .count());
+#endif
+    }
+    static u64 StatsNowNs() {
+        return static_cast<u64>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    std::chrono::steady_clock::now().time_since_epoch())
+                                    .count());
+    }
+    static void StatsThreadName(u32 tid, char* text, size_t capacity) {
+#ifdef _WIN64
+        wchar_t* name = nullptr;
+        if (HANDLE h = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, tid)) {
+            if (SUCCEEDED(GetThreadDescription(h, &name)) && name) {
+                WideCharToMultiByte(CP_UTF8, 0, name, -1, text, static_cast<int>(capacity) - 1,
+                                    nullptr, nullptr);
+                LocalFree(name);
+            }
+            CloseHandle(h);
+        }
+#else
+        char path[64];
+        std::snprintf(path, sizeof(path), "/proc/self/task/%u/comm", tid);
+        if (std::FILE* f = std::fopen(path, "r")) {
+            if (std::fgets(text, static_cast<int>(capacity), f)) {
+                text[std::strcspn(text, "\n")] = 0;
+            }
+            std::fclose(f);
+        }
+#endif
+    }
+
     /// sotc: SOTC_PROTECT_STATS=1 prints, every 5 s, the host protect calls per thread: count,
     /// pages and the time they took (which thread pays for the page tracking).
     static void NoteProtect(size_t size, u64 ns) {
-        const u32 tid = GetCurrentThreadId();
+        const u32 tid = StatsThreadId();
         for (auto& slot : protect_slots) {
             u32 expected = 0;
             if (slot.tid.load(std::memory_order_relaxed) == tid ||
@@ -854,7 +900,7 @@ struct SignalImpl : public PageManager::Impl {
             }
         }
         static std::atomic<u64> last_print{0};
-        const u64 now = GetTickCount64();
+        const u64 now = StatsNowMs();
         u64 last = last_print.load(std::memory_order_relaxed);
         if (now - last < 5000 || !last_print.compare_exchange_strong(last, now)) {
             return;
@@ -866,15 +912,8 @@ struct SignalImpl : public PageManager::Impl {
             if (!calls) {
                 continue;
             }
-            wchar_t* name = nullptr;
             char text[64] = "?";
-            if (HANDLE h = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, slot.tid.load())) {
-                if (SUCCEEDED(GetThreadDescription(h, &name)) && name) {
-                    WideCharToMultiByte(CP_UTF8, 0, name, -1, text, sizeof(text) - 1, nullptr, nullptr);
-                    LocalFree(name);
-                }
-                CloseHandle(h);
-            }
+            StatsThreadName(slot.tid.load(), text, sizeof(text));
             std::fprintf(stderr, "SOTC PROTECT %s: %llu calls/s, %llu pages/s, %.1f ms/s\n", text,
                          static_cast<unsigned long long>(calls / 5),
                          static_cast<unsigned long long>(pages / 5), spent / 5.0e6);
@@ -884,12 +923,9 @@ struct SignalImpl : public PageManager::Impl {
     void Protect(VAddr address, size_t size, Core::MemoryPermission perms) override {
         static const bool protect_stats = std::getenv("SOTC_PROTECT_STATS") != nullptr;
         if (protect_stats) [[unlikely]] {
-            LARGE_INTEGER t0, t1, f;
-            QueryPerformanceCounter(&t0);
+            const u64 t0 = StatsNowNs();
             ProtectImpl(address, size, perms);
-            QueryPerformanceCounter(&t1);
-            QueryPerformanceFrequency(&f);
-            NoteProtect(size, static_cast<u64>((t1.QuadPart - t0.QuadPart) * 1000000000ull / f.QuadPart));
+            NoteProtect(size, StatsNowNs() - t0);
             return;
         }
         ProtectImpl(address, size, perms);

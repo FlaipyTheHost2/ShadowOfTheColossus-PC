@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <execinfo.h> // sotc: backtrace (SOTC_VK_ALLOC_TRACE)
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <boost/container/static_vector.hpp>
@@ -801,12 +805,20 @@ void Instance::CreateAllocator() {
                 static const bool trace = std::getenv("SOTC_VK_ALLOC_TRACE") != nullptr;
                 if (trace && n >= 3000 && n < 3040) {
                     void* frames[16]{};
-                    const u32 count = CaptureStackBackTrace(1, 16, frames, nullptr);
                     std::string where;
+#ifdef _WIN32
+                    const u32 count = CaptureStackBackTrace(1, 16, frames, nullptr);
                     for (u32 i = 0; i < count; ++i) {
                         where += fmt::format(" {:#x}", reinterpret_cast<u64>(frames[i]) -
                                                            reinterpret_cast<u64>(GetModuleHandleW(nullptr)));
                     }
+#else
+                    // sotc (Linux): absolute addresses (libbbgpu.so's base is in /proc/<pid>/maps).
+                    const int count = backtrace(frames, 16);
+                    for (int i = 1; i < count; ++i) {
+                        where += fmt::format(" {:#x}", reinterpret_cast<u64>(frames[i]));
+                    }
+#endif
                     std::fprintf(stderr, "SOTC VKALLOC #%llu type %u size %llu KiB:%s\n",
                                  static_cast<unsigned long long>(n), type,
                                  static_cast<unsigned long long>(size >> 10), where.c_str());

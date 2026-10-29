@@ -15,6 +15,10 @@
 #include <miniz.h>
 #ifdef _WIN32
 #include <windows.h> // sotc: SetThreadPriority (background mode of the cache writer)
+#else
+// sotc (Linux): 64-bit offsets (off_t is 64 bits on x86-64).
+#define _fseeki64 fseeko
+#define _ftelli64 ftello
 #endif
 
 #include <algorithm>

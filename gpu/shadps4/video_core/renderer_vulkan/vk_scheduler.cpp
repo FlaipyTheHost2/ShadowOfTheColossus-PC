@@ -26,7 +26,20 @@
 #include <boost/container/small_vector.hpp>
 #include <immintrin.h>
 
+#ifdef _WIN32
 extern "C" const char __ImageBase;
+static uintptr_t ModuleBase() {
+    return reinterpret_cast<uintptr_t>(&__ImageBase);
+}
+#else
+#include <dlfcn.h>
+/// sotc (Linux): the base of libbbgpu.so, for module-relative addresses in the wait report.
+static uintptr_t ModuleBase() {
+    Dl_info info{};
+    dladdr(reinterpret_cast<const void*>(&ModuleBase), &info);
+    return reinterpret_cast<uintptr_t>(info.dli_fbase);
+}
+#endif
 
 namespace Vulkan {
 
@@ -95,7 +108,7 @@ struct GpuTimeDiag {
             std::fprintf(stderr, "%s\n", rows[i].second.c_str());
         }
     }
-    uintptr_t base = reinterpret_cast<uintptr_t>(&__ImageBase);
+    uintptr_t base = ModuleBase();
     std::vector<Stamp> pending_stamps;
 
     /// Called from the recording thread right where a rendering interval starts (end false) or ends.

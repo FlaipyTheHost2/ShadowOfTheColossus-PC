@@ -151,7 +151,10 @@ static void rw_wrlock(void) {
 static void rw_wrunlock(void) { __atomic_store_n(&lock_state,0,__ATOMIC_RELEASE); lock_wake(); }
 #else
 static pthread_rwlock_t lock=PTHREAD_RWLOCK_INITIALIZER;
-void runtime_memory_mark_draw_thread(void) {} /* sotc: Windows-only lock instrumentation */
+/* sotc: the GPU draw thread, for the draw thread's share in the SOTC_FPS protect report (the lock
+ * instrumentation above is Windows only). */
+static volatile unsigned long lock_draw_thread;
+void runtime_memory_mark_draw_thread(void) { lock_draw_thread=(unsigned long)gettid(); }
 static void rw_rdlock(void) { pthread_rwlock_rdlock(&lock); }
 static void rw_rdunlock(void) { pthread_rwlock_unlock(&lock); }
 static void rw_wrlock(void) { pthread_rwlock_wrlock(&lock); }
@@ -1903,13 +1906,29 @@ void runtime_memory_describe(uintptr_t address, char *out, size_t capacity) {
  * draw thread alone; read and cleared by runtime_memory_protect_stats (the FPS report). */
 static uint64_t protect_stat[4]; /* calls, ticks, draw calls, draw ticks */
 static int protect_stat_on = -1;
+/* sotc: 100 ns ticks (QPC's on Windows, the report's unit) and the calling thread's id. */
+static uint64_t protect_stat_ticks(void) {
+#ifdef _WIN32
+    LARGE_INTEGER t; QueryPerformanceCounter(&t); return (uint64_t)t.QuadPart;
+#else
+    struct timespec ts; clock_gettime(CLOCK_MONOTONIC,&ts);
+    return (uint64_t)ts.tv_sec*10000000u+(uint64_t)ts.tv_nsec/100u;
+#endif
+}
+static unsigned long protect_stat_thread(void) {
+#ifdef _WIN32
+    return GetCurrentThreadId();
+#else
+    return (unsigned long)gettid();
+#endif
+}
 void runtime_memory_protect_stats(uint64_t out[4]) {
     for (int i=0;i<4;++i) out[i]=__atomic_exchange_n(&protect_stat[i],0,__ATOMIC_RELAXED);
 }
 void runtime_memory_gpu_protect(uintptr_t address, uint64_t size, int read, int write) {
     if (protect_stat_on<0) { const char *v=getenv("SOTC_FPS"); protect_stat_on=v && v[0]=='1'; }
-    LARGE_INTEGER t0,t1;
-    if (protect_stat_on) QueryPerformanceCounter(&t0);
+    uint64_t t0=0;
+    if (protect_stat_on) t0=protect_stat_ticks();
     read_lock();
     for (size_t i=vma_index(address); i<vma_count && vmas[i].start<address+size; ++i) {
         if (vmas[i].kind==KIND_RESERVED) continue;
@@ -1921,11 +1940,10 @@ void runtime_memory_gpu_protect(uintptr_t address, uint64_t size, int read, int 
     }
     read_unlock();
     if (protect_stat_on) {
-        QueryPerformanceCounter(&t1);
-        uint64_t d=(uint64_t)(t1.QuadPart-t0.QuadPart);
+        uint64_t d=protect_stat_ticks()-t0;
         __atomic_add_fetch(&protect_stat[0],1,__ATOMIC_RELAXED);
         __atomic_add_fetch(&protect_stat[1],d,__ATOMIC_RELAXED);
-        if (lock_draw_thread==GetCurrentThreadId()) {
+        if (lock_draw_thread==protect_stat_thread()) {
             __atomic_add_fetch(&protect_stat[2],1,__ATOMIC_RELAXED);
             __atomic_add_fetch(&protect_stat[3],d,__ATOMIC_RELAXED);
         }
