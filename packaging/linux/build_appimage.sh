@@ -17,7 +17,7 @@ cd -- "$(dirname -- "$0")/../.."
 command -v patchelf >/dev/null || { echo 'Need patchelf (dnf/apt install patchelf).' >&2; exit 1; }
 python3 -c 'import tkinter' 2>/dev/null ||
     { echo 'Need python3 with Tk for the launcher (apt install python3-tk, dnf install python3-tkinter).' >&2; exit 1; }
-version=$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' CHANGELOG.md | head -1)
+version=$(sed -n 's/^## \([0-9][0-9.]*\(-[A-Za-z0-9]*\)\{0,1\}\).*/\1/p' CHANGELOG.md | head -1)
 output=dist/SotC-PC-${version:-dev}-linux-x86_64.AppImage
 
 work=$(mktemp -d)
@@ -31,6 +31,7 @@ cp -r scripts "$app/"
 find "$app/scripts" -name __pycache__ -prune -exec rm -rf {} +
 mkdir -p "$app/launcher"
 install -m644 launcher/sotc_launcher_win.py launcher/sotc_discovery.py launcher/sotc_i18n.py launcher/sotc_update.py \
+    launcher/sotc_report.py \
     launcher/sotc.png "$app/launcher/"
 install -m755 out/bb-probe out/bb-gpu-capabilities "$app/bin/"
 install -m755 out/gpu/libbbgpu.so "$app/bin/gpu/"

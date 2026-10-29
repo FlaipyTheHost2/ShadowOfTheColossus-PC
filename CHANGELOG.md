@@ -1,6 +1,11 @@
 # Changelog
 
 ## Linux (não lançado)
+- **Base: 0.60.6-plus26 do fork do Lucas-blip-png** (mais FPS: caminhos rápidos do Lukto02, cochilo
+  das threads de jobs, cache de shaders em journal; HDR, sombras do sol desligáveis), com a camada
+  Linux por cima. Diagnósticos novos dele (`SOTC_PROTECT_STATS`, `SOTC_VK_ALLOC_TRACE`, a linha de
+  proteções do `SOTC_FPS`) também funcionam no Linux. "Reportar problema" no lançador clássico
+  funciona no Linux e abre as issues deste repositório.
 - **Port nativo para Linux** (sem Wine/Proton). **Testado numa placa AMD** (Fedora): o jogo abre e
   renderiza a abertura. **NVIDIA e Intel ainda precisam de teste.**
 - Loader: imagem abaixo de 2 GiB também no Linux (ponteiros de 31 bits do jogo); guarda do heap

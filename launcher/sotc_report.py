@@ -11,7 +11,10 @@ import urllib.parse
 import zipfile
 from pathlib import Path
 
-ISSUES_URL = 'https://github.com/Lucas-blip-png/ShadowOfTheColossus-PC/issues/new'
+IS_WINDOWS = os.name == 'nt'
+# sotc: the Linux port is kept in its own repository, so Linux reports go there.
+ISSUES_URL = ('https://github.com/Lucas-blip-png/ShadowOfTheColossus-PC/issues/new' if IS_WINDOWS else
+              'https://github.com/FlaipyTheHost/ShadowOfTheColossus-PC/issues/new')
 TAIL_LINES = 150
 URL_BODY_MAX = 1500    # a browser URL longer than ~8000 characters is refused; the report goes by clipboard
 LOGS = ('last_run.log', 'events.log', 'last_run.1.log', 'events.1.log')
@@ -27,8 +30,34 @@ def _powershell(command):
         return ''
 
 
+def _hardware_linux():
+    """CPU and RAM from /proc; the GPU and its driver are in last_run.log (the port logs them)."""
+    cpu = ram = ''
+    try:
+        with open('/proc/cpuinfo', encoding='utf-8', errors='replace') as f:
+            cpu = next((l.split(':', 1)[1].strip() for l in f if l.startswith('model name')), '')
+        with open('/proc/meminfo', encoding='utf-8', errors='replace') as f:
+            kib = next((int(l.split()[1]) for l in f if l.startswith('MemTotal:')), 0)
+        ram = str(round(kib / (1024 * 1024))) if kib else ''
+    except (OSError, ValueError, IndexError):
+        pass
+    return '(see last_run.log)', cpu, ram
+
+
+def _os_line():
+    if IS_WINDOWS:
+        return f'Windows {platform.version()} ({platform.machine()})'
+    try:
+        name = platform.freedesktop_os_release().get('PRETTY_NAME', 'Linux')
+    except OSError:
+        name = 'Linux'
+    return f'{name}, kernel {platform.release()} ({platform.machine()})'
+
+
 def hardware():
     """GPU (name, driver, VRAM), CPU and RAM through CIM; empty lines when PowerShell is missing."""
+    if not IS_WINDOWS:  # creationflags below is Windows only (ValueError elsewhere)
+        return _hardware_linux()
     gpu = _powershell("Get-CimInstance Win32_VideoController | ForEach-Object { '{0} | driver {1} | VRAM (WMI, max 4095) {2} MB' "
                       "-f $_.Name, $_.DriverVersion, [math]::Round($_.AdapterRAM/1MB) }")
     cpu = _powershell('(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')
@@ -64,7 +93,7 @@ def build(version, settings, user_dir):
     crashes = sorted((Path(user_dir) / 'crashes').glob('*.log'))[-3:] if (Path(user_dir) / 'crashes').is_dir() else []
     parts = [
         f'Shadow of the Colossus PC {version}',
-        f'Windows {platform.version()} ({platform.machine()})',
+        _os_line(),
         f'CPU: {cpu or "?"} | RAM: {ram or "?"} GB',
         'GPU:', gpu or '?',
         'Settings: ' + json.dumps(config, ensure_ascii=False),
@@ -109,4 +138,8 @@ def issue_url(version, report):
 
 
 def open_issue(version, report):
-    os.startfile(issue_url(version, report))
+    if IS_WINDOWS:
+        os.startfile(issue_url(version, report))
+    else:
+        import webbrowser
+        webbrowser.open(issue_url(version, report))

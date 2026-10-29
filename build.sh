@@ -120,7 +120,7 @@ if [[ -n $CXX ]]; then
             "$CXX" -std=c++20 -O2 -w -I$imgui "${includes[@]}" -c "$source" -o "$object"
         fi
     done
-    version=$(sed -n 's/^## \([0-9][0-9.]*\).*/\1/p' CHANGELOG.md | head -1)
+    version=$(sed -n 's/^## \([0-9][0-9.]*\(-[A-Za-z0-9]*\)\{0,1\}\).*/\1/p' CHANGELOG.md | head -1)
     "$CXX" -std=c++20 -O2 -g -Wall -Wextra -Werror -DSOTC_VERSION="\"${version:-dev}\"" -I$imgui -I$imgui/backends \
         -Igpu/third_party/stb "${includes[@]}" launcher/linux/sotc_launcher.cpp out/launcher/*.o "${libraries[@]}" \
         -o out/sotc-launcher
