@@ -14,7 +14,7 @@ from pathlib import Path
 IS_WINDOWS = os.name == 'nt'
 # sotc: the Linux port is kept in its own repository, so Linux reports go there.
 ISSUES_URL = ('https://github.com/Lucas-blip-png/ShadowOfTheColossus-PC/issues/new' if IS_WINDOWS else
-              'https://github.com/FlaipyTheHost/ShadowOfTheColossus-PC/issues/new')
+              'https://github.com/FlaipyTheHost2/ShadowOfTheColossus-PC/issues/new')
 TAIL_LINES = 150
 URL_BODY_MAX = 1500    # a browser URL longer than ~8000 characters is refused; the report goes by clipboard
 LOGS = ('last_run.log', 'events.log', 'last_run.1.log', 'events.1.log')
